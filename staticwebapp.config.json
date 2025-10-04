@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "installCommand": "pnpm install",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/proxy/:path*",
+      "destination": "/api/proxy.ts"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
