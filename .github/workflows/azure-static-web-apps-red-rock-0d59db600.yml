@@ -26,14 +26,14 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.19.5' # Matches the error log
+          node-version: '20.19.5' # Matches error log
           cache: 'pnpm' # Cache pnpm dependencies
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
           version: '8.15.1' # Stable version; adjust based on package.json
-          run_install: false # Prevent automatic pnpm install here
+          run_install: false # Prevent automatic pnpm install
 
       - name: Verify pnpm installation
         run: |
@@ -50,11 +50,9 @@ jobs:
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_LIVELY_MOSS_069E6C200 }}
           action: 'upload'
-          ###### Repository/Build Configurations ######
           app_location: '/' # App source code path (root)
           api_location: 'api' # API source code path (assumes proxy.ts is in /api)
           output_location: 'build' # Built app content directory
-          ###### End of Repository/Build Configurations ######
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
