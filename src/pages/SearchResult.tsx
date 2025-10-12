@@ -37,6 +37,8 @@ export default function SearchResult() {
   }, [searchRes])
   // 加载控制
   const [loading, setLoading] = useState(true)
+  // 加载超时控制
+  const timeOutTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // 接近底部浅色区域时反色分页
   const [invertPagination, setInvertPagination] = useState(false)
   // 筛选启用的视频源
@@ -61,6 +63,15 @@ export default function SearchResult() {
       abortCtrlRef.current?.abort()
       const controller = new AbortController()
       abortCtrlRef.current = controller
+      // 取消超时计时
+      if (timeOutTimer.current) {
+        clearTimeout(timeOutTimer.current)
+        timeOutTimer.current = null
+      }
+      timeOutTimer.current = setTimeout(() => {
+        setLoading(false)
+        timeOutTimer.current = null
+      }, PaginationConfig.maxRequestTimeout)
       setSearchRes([])
       const searchPromise = apiService
         .aggregatedSearch(
