@@ -188,7 +188,7 @@ export default function Video() {
         playerRef.current = null
       }
     }
-  }, [selectedEpisode, detail, sourceCode, vodId, addViewingHistory, viewingHistory])
+  }, [selectedEpisode, detail, sourceCode, vodId, addViewingHistory])
 
   // 处理集数切换
   const handleEpisodeChange = (index: number) => {
