@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router'
+import { useParams } from 'react-router'
 import { apiService } from '@/services/api.service'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { type VideoItem } from '@/types'
@@ -20,7 +20,6 @@ import { useDocumentTitle } from '@/hooks'
 export default function SearchResult() {
   const abortCtrlRef = useRef<AbortController | null>(null)
   const { videoAPIs } = useApiStore()
-  const navigate = useNavigate()
 
   const { query } = useParams()
   const [searchRes, setSearchRes] = useState<VideoItem[]>([])
