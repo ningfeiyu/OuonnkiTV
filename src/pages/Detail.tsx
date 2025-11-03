@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { apiService } from '@/services/api.service'
 import { type DetailResponse } from '@/types'
 import { useApiStore } from '@/store/apiStore'
-import { Chip, Button, Spinner } from '@heroui/react'
+import { Chip, Button, Spinner, Tooltip } from '@heroui/react'
 import { useDocumentTitle } from '@/hooks'
 
 export default function Detail() {
@@ -88,10 +88,14 @@ export default function Detail() {
 
       <div className="flex gap-5">
         {/* 封面图 */}
-        <img src={getCover()} alt={getTitle()} className="hidden rounded-lg shadow-lg md:block" />
+        <img
+          src={getCover()}
+          alt={getTitle()}
+          className="hidden w-70 rounded-lg shadow-lg md:block"
+        />
 
         {/* 详细信息 */}
-        <div className="flex flex-col gap-3 rounded-lg bg-white/40 p-4 shadow-lg backdrop-blur-md">
+        <div className="flex flex-1 flex-col gap-3 rounded-lg bg-white/40 p-4 shadow-lg/5 backdrop-blur-md">
           {/* 移动端封面 */}
           <img src={getCover()} alt={getTitle()} className="rounded-lg shadow-lg md:hidden" />
           {/* 标题 */}
@@ -100,7 +104,7 @@ export default function Detail() {
               <span className="text-gray-800">{getTitle()}</span>
             </h1>
           )}
-          <div>
+          <div className="flex flex-wrap gap-x-1 gap-y-2">
             <Chip color="primary" variant="shadow" className="mr-2">
               {getSourceName()}
             </Chip>
@@ -142,19 +146,22 @@ export default function Detail() {
 
       {/* 播放列表 */}
       {getEpisodesNames() && getEpisodesNames().length > 0 && (
-        <div className="mt-8 grid grid-cols-3 gap-5 md:grid-cols-6 lg:grid-cols-8">
-          {getEpisodesNames().map((name, index) => (
-            <Button
-              key={name}
-              size="md"
-              color="default"
-              variant="shadow"
-              className="border border-gray-200 bg-white/30 text-gray-800 shadow backdrop-blur-md transition-all duration-300 hover:scale-105 hover:bg-black/80 hover:text-white"
-              onPress={() => handlePlayEpisode(index)}
-            >
-              {name}
-            </Button>
-          ))}
+        <div className="mt-8">
+          <div className="grid grid-cols-3 gap-5 md:grid-cols-6 lg:grid-cols-8">
+            {getEpisodesNames().map((name, index) => (
+              <Tooltip key={name} content={name} placement="top" delay={1000}>
+                <Button
+                  size="md"
+                  color="default"
+                  variant="shadow"
+                  className="border border-gray-200 bg-white/30 text-gray-800 drop-shadow-2xl backdrop-blur-md transition-all duration-300 hover:scale-105 hover:bg-black/80 hover:text-white"
+                  onPress={() => handlePlayEpisode(index)}
+                >
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap">{name}</span>
+                </Button>
+              </Tooltip>
+            ))}
+          </div>
         </div>
       )}
     </div>

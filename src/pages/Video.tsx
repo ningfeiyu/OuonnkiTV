@@ -4,7 +4,7 @@ import Player from 'xgplayer'
 import { Events } from 'xgplayer'
 import HlsPlugin from 'xgplayer-hls'
 import 'xgplayer/dist/index.min.css'
-import { Card, CardHeader, CardBody, Button, Chip, Spinner } from '@heroui/react'
+import { Card, CardHeader, CardBody, Button, Chip, Spinner, Tooltip } from '@heroui/react'
 import type { DetailResponse, VideoItem } from '@/types'
 import { apiService } from '@/services/api.service'
 import { useApiStore } from '@/store/apiStore'
@@ -319,22 +319,23 @@ export default function Video() {
 
       {/* 选集列表 */}
       {detail.videoInfo?.episodes_names && detail.videoInfo?.episodes_names.length > 0 && (
-        <div className="mt-8 grid grid-cols-3 gap-5 opacity-20 transition-opacity duration-400 hover:opacity-100 md:grid-cols-6 lg:grid-cols-8">
+        <div className="mt-8 grid grid-cols-3 gap-5 duration-400 md:grid-cols-6 md:opacity-20 md:transition-opacity md:hover:opacity-100 lg:grid-cols-8">
           {detail.videoInfo?.episodes_names.map((name, index) => (
-            <Button
-              key={name}
-              size="md"
-              color="default"
-              variant="shadow"
-              className={
-                selectedEpisode === index
-                  ? 'border border-gray-200 bg-gray-900 text-white shadow'
-                  : 'border border-gray-200 bg-white/30 text-gray-800 shadow backdrop-blur-md transition-all duration-300 hover:scale-105 hover:bg-black/80 hover:text-white'
-              }
-              onPress={() => handleEpisodeChange(index)}
-            >
-              {name}
-            </Button>
+            <Tooltip key={name} content={name} placement="top" delay={1000}>
+              <Button
+                size="md"
+                color="default"
+                variant="shadow"
+                className={
+                  selectedEpisode === index
+                    ? 'border border-gray-200 bg-gray-900 text-white drop-shadow-2xl'
+                    : 'border border-gray-200 bg-white/30 text-gray-800 drop-shadow-2xl backdrop-blur-md transition-all duration-300 hover:scale-105 hover:bg-black/80 hover:text-white'
+                }
+                onPress={() => handleEpisodeChange(index)}
+              >
+                <span className="overflow-hidden text-ellipsis whitespace-nowrap">{name}</span>
+              </Button>
+            </Tooltip>
           ))}
         </div>
       )}
