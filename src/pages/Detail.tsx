@@ -1,20 +1,22 @@
-import { useParams, useLocation, useNavigate } from 'react-router'
+import { useParams, useNavigate } from 'react-router'
 import { useState, useEffect } from 'react'
 import { apiService } from '@/services/api.service'
-import { type DetailResponse, type VideoItem } from '@/types'
+import { type DetailResponse } from '@/types'
 import { useApiStore } from '@/store/apiStore'
 import { Card, CardHeader, CardBody, Chip, Button, Spinner } from '@heroui/react'
+import { useDocumentTitle } from '@/hooks'
 
 export default function Detail() {
   const { sourceCode, vodId } = useParams<{ sourceCode: string; vodId: string }>()
-  const location = useLocation()
   const navigate = useNavigate()
-  const videoItem = location.state?.videoItem as VideoItem | undefined
   const { videoAPIs } = useApiStore()
 
   const [detail, setDetail] = useState<DetailResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedEpisode, setSelectedEpisode] = useState(0)
+
+  // 动态更新页面标题
+  useDocumentTitle(detail?.videoInfo?.title || '视频详情')
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -47,7 +49,6 @@ export default function Detail() {
     navigate(`/video/${sourceCode}/${vodId}/${index}`, {
       state: {
         detail,
-        videoItem,
         episodeIndex: index,
       },
     })
@@ -70,18 +71,17 @@ export default function Detail() {
   }
 
   const videoInfo = detail.videoInfo
-  const displayInfo = videoItem || videoInfo
+  const displayInfo = videoInfo
 
   // 获取显示信息的辅助函数
-  const getTitle = () => videoItem?.vod_name || videoInfo?.title || ''
-  const getCover = () =>
-    videoItem?.vod_pic || videoInfo?.cover || 'https://via.placeholder.com/300x400?text=暂无封面'
-  const getType = () => videoItem?.type_name || videoInfo?.type || ''
-  const getYear = () => videoItem?.vod_year || videoInfo?.year || ''
-  const getDirector = () => videoItem?.vod_director || videoInfo?.director || ''
-  const getActor = () => videoItem?.vod_actor || videoInfo?.actor || ''
-  const getArea = () => videoItem?.vod_area || videoInfo?.area || ''
-  const getContent = () => videoItem?.vod_content || videoInfo?.desc || ''
+  const getTitle = () => videoInfo?.title || ''
+  const getCover = () => videoInfo?.cover || 'https://via.placeholder.com/300x400?text=暂无封面'
+  const getType = () => videoInfo?.type || ''
+  const getYear = () => videoInfo?.year || ''
+  const getDirector = () => videoInfo?.director || ''
+  const getActor = () => videoInfo?.actor || ''
+  const getArea = () => videoInfo?.area || ''
+  const getContent = () => videoInfo?.desc || ''
 
   return (
     <div className="container mx-auto p-4">

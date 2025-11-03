@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import Player from 'xgplayer'
 import { Events } from 'xgplayer'
@@ -9,6 +9,7 @@ import type { DetailResponse, VideoItem } from '@/types'
 import { apiService } from '@/services/api.service'
 import { useApiStore } from '@/store/apiStore'
 import { useViewingHistoryStore } from '@/store/viewingHistoryStore'
+import { useDocumentTitle } from '@/hooks'
 import _ from 'lodash'
 
 export default function Video() {
@@ -40,6 +41,17 @@ export default function Video() {
   // 获取显示信息
   const getTitle = () => videoItem?.vod_name || detail?.videoInfo?.title || '未知视频'
   const sourceName = videoItem?.source_name || detail?.videoInfo?.source_name || '未知来源'
+
+  // 动态更新页面标题
+  const pageTitle = useMemo(() => {
+    const title = videoItem?.vod_name || detail?.videoInfo?.title
+    if (title) {
+      return `${title}`
+    }
+    return '视频播放'
+  }, [videoItem?.vod_name, detail?.videoInfo?.title, selectedEpisode])
+
+  useDocumentTitle(pageTitle)
 
   // 获取视频详情
   useEffect(() => {
