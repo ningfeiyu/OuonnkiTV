@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, useMemo } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import Player from 'xgplayer'
 import { Events } from 'xgplayer'
 import HlsPlugin from 'xgplayer-hls'
 import 'xgplayer/dist/index.min.css'
 import { Card, CardHeader, CardBody, Button, Chip, Spinner, Tooltip } from '@heroui/react'
-import type { DetailResponse, VideoItem } from '@/types'
+import type { DetailResponse } from '@/types'
 import { apiService } from '@/services/api.service'
 import { useApiStore } from '@/store/apiStore'
 import { useViewingHistoryStore } from '@/store/viewingHistoryStore'
@@ -13,7 +13,6 @@ import { useDocumentTitle } from '@/hooks'
 import _ from 'lodash'
 
 export default function Video() {
-  const location = useLocation()
   const navigate = useNavigate()
   const { sourceCode, vodId, episodeIndex } = useParams<{
     sourceCode: string
@@ -29,27 +28,26 @@ export default function Video() {
   const { addViewingHistory, viewingHistory } = useViewingHistoryStore()
 
   // 状态管理
-  const [detail, setDetail] = useState<DetailResponse | null>(location.state?.detail || null)
-  const [videoItem, setVideoItem] = useState<VideoItem | undefined>(location.state?.videoItem)
+  const [detail, setDetail] = useState<DetailResponse | null>(null)
   const [selectedEpisode, setSelectedEpisode] = useState(() => {
     const index = parseInt(episodeIndex || '0')
     return isNaN(index) ? 0 : index
   })
-  const [loading, setLoading] = useState(!location.state?.detail)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   // 获取显示信息
-  const getTitle = () => videoItem?.vod_name || detail?.videoInfo?.title || '未知视频'
-  const sourceName = videoItem?.source_name || detail?.videoInfo?.source_name || '未知来源'
+  const getTitle = () => detail?.videoInfo?.title || '未知视频'
+  const sourceName = detail?.videoInfo?.source_name || '未知来源'
 
   // 动态更新页面标题
   const pageTitle = useMemo(() => {
-    const title = videoItem?.vod_name || detail?.videoInfo?.title
+    const title = detail?.videoInfo?.title
     if (title) {
       return `${title}`
     }
     return '视频播放'
-  }, [videoItem?.vod_name, detail?.videoInfo?.title, selectedEpisode])
+  }, [detail?.videoInfo?.title])
 
   useDocumentTitle(pageTitle)
 
@@ -58,11 +56,7 @@ export default function Video() {
     const fetchVideoDetail = async () => {
       if (!sourceCode || !vodId) {
         setError('缺少必要的参数')
-        return
-      }
-
-      // 如果已有数据，不需要重新获取
-      if (detail && detail.episodes && detail.episodes.length > 0) {
+        setLoading(false)
         return
       }
 
@@ -81,24 +75,6 @@ export default function Video() {
 
         if (response.code === 200 && response.episodes && response.episodes.length > 0) {
           setDetail(response)
-          // 如果没有 videoItem，使用 response 中的信息
-          if (!videoItem && response.videoInfo) {
-            setVideoItem({
-              vod_id: vodId,
-              vod_name: response.videoInfo.title,
-              vod_pic: response.videoInfo.cover,
-              vod_remarks: response.videoInfo.remarks,
-              type_name: response.videoInfo.type,
-              vod_year: response.videoInfo.year,
-              vod_area: response.videoInfo.area,
-              vod_director: response.videoInfo.director,
-              vod_actor: response.videoInfo.actor,
-              vod_content: response.videoInfo.desc,
-              source_name: response.videoInfo.source_name,
-              source_code: response.videoInfo.source_code,
-              api_url: api.url,
-            })
-          }
         } else {
           throw new Error(response.msg || '获取视频详情失败')
         }
@@ -111,7 +87,7 @@ export default function Video() {
     }
 
     fetchVideoDetail()
-  }, [sourceCode, vodId, detail, videoItem, videoAPIs])
+  }, [sourceCode, vodId, videoAPIs])
 
   // 监听 selectedEpisode 和 URL 参数变化
   useEffect(() => {
@@ -119,7 +95,7 @@ export default function Video() {
     if (!isNaN(urlEpisodeIndex) && urlEpisodeIndex !== selectedEpisode) {
       setSelectedEpisode(urlEpisodeIndex)
     }
-  }, [episodeIndex])
+  }, [episodeIndex, selectedEpisode])
 
   useEffect(() => {
     if (!detail?.episodes || !detail.episodes[selectedEpisode]) return
@@ -155,12 +131,12 @@ export default function Video() {
     // 记录观看历史
     const player = playerRef.current
     const normalAddHistory = () => {
-      if (!sourceCode || !vodId) return
+      if (!sourceCode || !vodId || !detail?.videoInfo) return
       addViewingHistory({
-        title: getTitle(),
-        imageUrl: videoItem?.vod_pic || '',
+        title: detail.videoInfo.title || '未知视频',
+        imageUrl: detail.videoInfo.cover || '',
         sourceCode: sourceCode || '',
-        sourceName: videoItem?.source_name || '',
+        sourceName: detail.videoInfo.source_name || '',
         vodId: vodId || '',
         episodeIndex: selectedEpisode,
         playbackPosition: player.currentTime || 0,
@@ -178,7 +154,7 @@ export default function Video() {
     const TIME_UPDATE_INTERVAL = 3000
 
     const timeUpdateHandler = () => {
-      if (!sourceCode || !vodId) return
+      if (!sourceCode || !vodId || !detail?.videoInfo) return
       const currentTime = player.currentTime || 0
       const duration = player.duration || 0
       const timeSinceLastUpdate = Date.now() - lastTimeUpdate
@@ -186,10 +162,10 @@ export default function Video() {
       if (timeSinceLastUpdate >= TIME_UPDATE_INTERVAL && currentTime > 0 && duration > 0) {
         lastTimeUpdate = Date.now()
         addViewingHistory({
-          title: getTitle(),
-          imageUrl: videoItem?.vod_pic || '',
+          title: detail.videoInfo.title || '未知视频',
+          imageUrl: detail.videoInfo.cover || '',
           sourceCode: sourceCode || '',
-          sourceName: videoItem?.source_name || '',
+          sourceName: detail.videoInfo.source_name || '',
           vodId: vodId || '',
           episodeIndex: selectedEpisode,
           playbackPosition: currentTime,
@@ -218,7 +194,6 @@ export default function Video() {
     // 更新 URL，保持路由同步
     navigate(`/video/${sourceCode}/${vodId}/${index}`, {
       replace: true,
-      state: { detail, videoItem },
     })
   }
 

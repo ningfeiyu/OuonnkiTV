@@ -43,13 +43,8 @@ export default function Detail() {
 
   // 处理播放按钮点击
   const handlePlayEpisode = (index: number) => {
-    // 跳转到播放页面，使用新的路由格式
-    navigate(`/video/${sourceCode}/${vodId}/${index}`, {
-      state: {
-        detail,
-        episodeIndex: index,
-      },
-    })
+    // 跳转到播放页面，使用新的路由格式，不传递 state
+    navigate(`/video/${sourceCode}/${vodId}/${index}`)
   }
 
   if (loading) {
