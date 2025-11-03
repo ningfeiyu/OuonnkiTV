@@ -54,6 +54,7 @@ export interface ViewingHistoryItem {
   title: string
   imageUrl: string
   episodeIndex: number
+  episodeName?: string // 集数名称，例如 "第01集"、"第1集" 等
   sourceCode: string
   sourceName: string
   vodId: string

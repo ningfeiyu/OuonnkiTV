@@ -139,6 +139,7 @@ export default function Video() {
         sourceName: detail.videoInfo.source_name || '',
         vodId: vodId || '',
         episodeIndex: selectedEpisode,
+        episodeName: detail.videoInfo.episodes_names?.[selectedEpisode],
         playbackPosition: player.currentTime || 0,
         duration: player.duration || 0,
         timestamp: Date.now(),
@@ -168,6 +169,7 @@ export default function Video() {
           sourceName: detail.videoInfo.source_name || '',
           vodId: vodId || '',
           episodeIndex: selectedEpisode,
+          episodeName: detail.videoInfo.episodes_names?.[selectedEpisode],
           playbackPosition: currentTime,
           duration: duration,
           timestamp: Date.now(),
@@ -186,7 +188,7 @@ export default function Video() {
         playerRef.current = null
       }
     }
-  }, [selectedEpisode, detail, sourceCode, vodId, addViewingHistory])
+  }, [selectedEpisode, detail, sourceCode, vodId, addViewingHistory, viewingHistory])
 
   // 处理集数切换
   const handleEpisodeChange = (index: number) => {

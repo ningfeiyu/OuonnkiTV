@@ -18,6 +18,14 @@ dayjs.extend(relativeTime)
 dayjs.locale('zh-cn')
 dayjs.extend(duration)
 
+// 格式化集数显示
+const formatEpisodeDisplay = (item: ViewingHistoryItem): string => {
+  if (item.episodeName) {
+    return item.episodeName
+  }
+  return `第${item.episodeIndex + 1}集`
+}
+
 const HistoryList = ({
   viewingHistory,
   removeViewingHistory,
@@ -117,7 +125,7 @@ const HistoryList = ({
                     {item.title}
                   </div>
                   <div className="flex w-full items-center justify-between gap-[2cqw] text-[3cqw] md:gap-2 md:text-xs">
-                    <div className="text-gray-500">第{item.episodeIndex + 1}集</div>
+                    <div className="text-gray-500">{formatEpisodeDisplay(item)}</div>
                     <div className="text-gray-500">
                       已看 {((item.playbackPosition / item.duration) * 100).toFixed(0)}%{' '}
                     </div>
