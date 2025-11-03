@@ -1,14 +1,19 @@
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
-import type { SearchHistory, SearchHistoryItem } from '@/types'
+import type { SearchHistory, SearchHistoryItem, VideoItem } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
+
+// 搜索结果缓存最大数量
+const MAX_CACHE_SIZE = 10
 
 interface SearchState {
   // 当前搜索查询
   query: string
   // 搜索历史记录
   searchHistory: SearchHistory
+  // 搜索结果缓存 (query -> results)
+  searchResultsCache: Record<string, VideoItem[]>
 }
 
 interface SearchActions {
@@ -22,6 +27,12 @@ interface SearchActions {
   removeSearchHistoryItem: (id: string) => void
   // 清空搜索历史
   clearSearchHistory: () => void
+  // 获取缓存的搜索结果
+  getCachedResults: (query: string) => VideoItem[] | undefined
+  // 设置搜索结果缓存
+  setCachedResults: (query: string, results: VideoItem[]) => void
+  // 清空搜索结果缓存
+  clearSearchResultsCache: () => void
 }
 
 type SearchStore = SearchState & SearchActions
@@ -29,10 +40,11 @@ type SearchStore = SearchState & SearchActions
 export const useSearchStore = create<SearchStore>()(
   devtools(
     persist(
-      immer(set => ({
+      immer((set, get) => ({
         // 初始状态
         query: '',
         searchHistory: [],
+        searchResultsCache: {},
 
         // Actions
         setQuery: (query: string) => {
@@ -85,6 +97,30 @@ export const useSearchStore = create<SearchStore>()(
         clearSearchHistory: () => {
           set(state => {
             state.searchHistory = []
+          })
+        },
+
+        getCachedResults: (query: string) => {
+          return get().searchResultsCache[query]
+        },
+
+        setCachedResults: (query: string, results: VideoItem[]) => {
+          set(state => {
+            // 如果缓存数量超过限制,删除最旧的缓存
+            const cacheKeys = Object.keys(state.searchResultsCache)
+            if (cacheKeys.length >= MAX_CACHE_SIZE) {
+              const firstKey = cacheKeys[0]
+              if (firstKey) {
+                delete state.searchResultsCache[firstKey]
+              }
+            }
+            state.searchResultsCache[query] = results
+          })
+        },
+
+        clearSearchResultsCache: () => {
+          set(state => {
+            state.searchResultsCache = {}
           })
         },
       })),

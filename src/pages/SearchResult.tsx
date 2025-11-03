@@ -1,8 +1,9 @@
-import { useParams } from 'react-router'
+import { useParams, useNavigate } from 'react-router'
 import { apiService } from '@/services/api.service'
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { type VideoItem } from '@/types'
 import { useApiStore } from '@/store/apiStore'
+import { useSearchStore } from '@/store/searchStore'
 import {
   Card,
   CardFooter,
@@ -20,6 +21,8 @@ import { useDocumentTitle } from '@/hooks'
 export default function SearchResult() {
   const abortCtrlRef = useRef<AbortController | null>(null)
   const { videoAPIs } = useApiStore()
+  const { getCachedResults, setCachedResults } = useSearchStore()
+  const navigate = useNavigate()
 
   const { query } = useParams()
   const [searchRes, setSearchRes] = useState<VideoItem[]>([])
@@ -45,68 +48,83 @@ export default function SearchResult() {
   }, [videoAPIs])
 
   // 调用搜索内容
-  const fetchSearchRes = async (keyword: string | undefined) => {
-    if (!keyword) return
-    // 取消上一次未完成的搜索
-    abortCtrlRef.current?.abort()
-    const controller = new AbortController()
-    abortCtrlRef.current = controller
-    // 取消超时计时
-    if (timeOutTimer.current) {
-      clearTimeout(timeOutTimer.current)
-      timeOutTimer.current = null
-    }
-    timeOutTimer.current = setTimeout(() => {
-      setLoading(false)
-      timeOutTimer.current = null
-    }, PaginationConfig.maxRequestTimeout)
-    setSearchRes([])
-    const searchPromise = apiService
-      .aggregatedSearch(
-        keyword,
-        selectedAPIs,
-        newResults => {
-          setSearchRes(prevResults => {
-            const mergedRes = [...prevResults, ...newResults]
-            if (mergedRes.length >= PaginationConfig.singlePageSize) setLoading(false)
-            return mergedRes
-          })
-        },
-        controller.signal,
-      )
-      .then(allResults => {
-        addToast({
-          title: '全部内容搜索完成！总计 ' + allResults.length + ' 条结果',
-          radius: 'lg',
-          color: 'success',
-          timeout: 2000,
-          classNames: {
-            base: 'bg-white/60 backdrop-blur-lg border-0',
-          },
-        })
-      })
-      .catch(error => {
-        if ((error as Error).name === 'AbortError') {
-          console.error('搜索已取消:', error)
-        } else {
-          console.error('搜索时发生错误:', error)
-        }
-      })
-      .finally(() => {
-        setLoading(false)
-      })
+  const fetchSearchRes = useCallback(
+    async (keyword: string | undefined) => {
+      if (!keyword) return
 
-    addToast({
-      title: '持续搜索内容中......',
-      promise: searchPromise,
-      radius: 'lg',
-      timeout: 1,
-      hideCloseButton: true,
-      classNames: {
-        base: 'bg-white/60 backdrop-blur-lg border-0',
-      },
-    })
-  }
+      // 检查缓存
+      const cachedResults = getCachedResults(keyword)
+      if (cachedResults) {
+        console.log('使用缓存的搜索结果')
+        setSearchRes(cachedResults)
+        setLoading(false)
+        return
+      }
+
+      // 取消上一次未完成的搜索
+      abortCtrlRef.current?.abort()
+      const controller = new AbortController()
+      abortCtrlRef.current = controller
+      // 取消超时计时
+      if (timeOutTimer.current) {
+        clearTimeout(timeOutTimer.current)
+        timeOutTimer.current = null
+      }
+      timeOutTimer.current = setTimeout(() => {
+        setLoading(false)
+        timeOutTimer.current = null
+      }, PaginationConfig.maxRequestTimeout)
+      setSearchRes([])
+      const searchPromise = apiService
+        .aggregatedSearch(
+          keyword,
+          selectedAPIs,
+          newResults => {
+            setSearchRes(prevResults => {
+              const mergedRes = [...prevResults, ...newResults]
+              if (mergedRes.length >= PaginationConfig.singlePageSize) setLoading(false)
+              return mergedRes
+            })
+          },
+          controller.signal,
+        )
+        .then(allResults => {
+          // 缓存搜索结果
+          setCachedResults(keyword, allResults)
+          addToast({
+            title: '全部内容搜索完成！总计 ' + allResults.length + ' 条结果',
+            radius: 'lg',
+            color: 'success',
+            timeout: 2000,
+            classNames: {
+              base: 'bg-white/60 backdrop-blur-lg border-0',
+            },
+          })
+        })
+        .catch(error => {
+          if ((error as Error).name === 'AbortError') {
+            console.error('搜索已取消:', error)
+          } else {
+            console.error('搜索时发生错误:', error)
+          }
+        })
+        .finally(() => {
+          setLoading(false)
+        })
+
+      addToast({
+        title: '持续搜索内容中......',
+        promise: searchPromise,
+        radius: 'lg',
+        timeout: 1,
+        hideCloseButton: true,
+        classNames: {
+          base: 'bg-white/60 backdrop-blur-lg border-0',
+        },
+      })
+    },
+    [selectedAPIs, getCachedResults, setCachedResults],
+  )
 
   // 动态更新页面标题
   useDocumentTitle(query ? `${query}` : '搜索结果')
@@ -115,11 +133,12 @@ export default function SearchResult() {
   // 组件卸载时取消未完成的搜索
   useEffect(() => {
     setLoading(true)
+    setCurPage(1) // 重置页码
     fetchSearchRes(query)
     return () => {
       abortCtrlRef.current?.abort()
     }
-  }, [])
+  }, [query, fetchSearchRes])
   // 监听滚动位置变化以调整分页样式
   useEffect(() => {
     let timer: number | null = null
@@ -184,11 +203,7 @@ export default function SearchResult() {
                 key={`${item.source_code}_${item.vod_id}_${index}`}
                 isPressable
                 isFooterBlurred
-                as={'a'}
-                href={`/detail/${item.source_code}/${item.vod_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                // onPress={() => handleCardClick(item)}
+                onPress={() => navigate(`/detail/${item.source_code}/${item.vod_id}`)}
                 className="flex h-[27vh] w-full items-center border-none transition-transform hover:scale-103 lg:h-[35vh]"
                 radius="lg"
               >
