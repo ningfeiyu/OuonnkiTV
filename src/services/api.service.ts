@@ -107,6 +107,7 @@ class ApiService {
 
       const videoDetail = data.list[0]
       let episodes: string[] = []
+      let episodeNames: string[] = []
 
       // 提取播放地址
       if (videoDetail.vod_play_url) {
@@ -123,6 +124,11 @@ class ApiService {
             .filter(
               (url: string) => url && (url.startsWith('http://') || url.startsWith('https://')),
             )
+
+          episodeNames = episodeList.map((ep: string, index: number) => {
+            const parts = ep.split('$')
+            return parts.length > 1 ? parts[0] : `第${index + 1}集`
+          })
         }
       }
 
@@ -148,6 +154,7 @@ class ApiService {
           remarks: videoDetail.vod_remarks,
           source_name: api.name,
           source_code: api.id,
+          episodes_names: episodeNames,
         },
       }
     } catch (error) {

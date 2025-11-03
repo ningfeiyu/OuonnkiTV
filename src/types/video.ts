@@ -30,6 +30,7 @@ export interface VideoDetail {
   remarks?: string
   source_name?: string
   source_code?: string
+  episodes_names?: string[]
 }
 
 // 搜索响应

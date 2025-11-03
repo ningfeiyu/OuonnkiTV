@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { apiService } from '@/services/api.service'
 import { type DetailResponse } from '@/types'
 import { useApiStore } from '@/store/apiStore'
-import { Card, CardHeader, CardBody, Chip, Button, Spinner } from '@heroui/react'
+import { Chip, Button, Spinner } from '@heroui/react'
 import { useDocumentTitle } from '@/hooks'
 
 export default function Detail() {
@@ -13,7 +13,6 @@ export default function Detail() {
 
   const [detail, setDetail] = useState<DetailResponse | null>(null)
   const [loading, setLoading] = useState(true)
-  const [selectedEpisode, setSelectedEpisode] = useState(0)
 
   // 动态更新页面标题
   useDocumentTitle(detail?.videoInfo?.title || '视频详情')
@@ -44,7 +43,6 @@ export default function Detail() {
 
   // 处理播放按钮点击
   const handlePlayEpisode = (index: number) => {
-    setSelectedEpisode(index)
     // 跳转到播放页面，使用新的路由格式
     navigate(`/video/${sourceCode}/${vodId}/${index}`, {
       state: {
@@ -71,7 +69,6 @@ export default function Detail() {
   }
 
   const videoInfo = detail.videoInfo
-  const displayInfo = videoInfo
 
   // 获取显示信息的辅助函数
   const getTitle = () => videoInfo?.title || ''
@@ -82,96 +79,83 @@ export default function Detail() {
   const getActor = () => videoInfo?.actor || ''
   const getArea = () => videoInfo?.area || ''
   const getContent = () => videoInfo?.desc || ''
+  const getSourceName = () => videoInfo?.source_name || ''
+  const getEpisodesNames = () => videoInfo?.episodes_names || []
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto p-4 pb-15 md:pt-10">
       {/* 视频信息卡片 */}
-      <Card className="mb-6">
-        <CardHeader className="flex gap-4">
-          <div className="flex flex-col">
-            <h1 className="text-2xl font-bold">{getTitle()}</h1>
-            <div className="mt-2 flex gap-2">
-              {displayInfo?.source_name && (
-                <Chip size="sm" color="primary" variant="flat">
-                  {displayInfo.source_name}
-                </Chip>
-              )}
-              {getType() && (
-                <Chip size="sm" color="secondary" variant="flat">
-                  {getType()}
-                </Chip>
-              )}
-              {getYear() && (
-                <Chip size="sm" variant="flat">
-                  {getYear()}
-                </Chip>
-              )}
-            </div>
+
+      <div className="flex gap-5">
+        {/* 封面图 */}
+        <img src={getCover()} alt={getTitle()} className="hidden rounded-lg shadow-lg md:block" />
+
+        {/* 详细信息 */}
+        <div className="flex flex-col gap-3 rounded-lg bg-white/40 p-4 shadow-lg backdrop-blur-md">
+          {/* 移动端封面 */}
+          <img src={getCover()} alt={getTitle()} className="rounded-lg shadow-lg md:hidden" />
+          {/* 标题 */}
+          {getTitle() && (
+            <h1 className="text-3xl font-bold">
+              <span className="text-gray-800">{getTitle()}</span>
+            </h1>
+          )}
+          <div>
+            <Chip color="primary" variant="shadow" className="mr-2">
+              {getSourceName()}
+            </Chip>
+            <Chip color="secondary" variant="shadow" className="mr-2">
+              {getYear()}
+            </Chip>
+            <Chip color="warning" variant="shadow" className="mr-2">
+              {getType()}
+            </Chip>
+            <Chip color="danger" variant="shadow" className="mr-2">
+              {getArea()}
+            </Chip>
           </div>
-        </CardHeader>
-        <CardBody>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            {/* 封面图 */}
-            <div className="md:col-span-1">
-              <img src={getCover()} alt={getTitle()} className="w-full rounded-lg shadow-lg" />
-            </div>
 
-            {/* 详细信息 */}
-            <div className="space-y-4 md:col-span-2">
-              {getDirector() && (
-                <div>
-                  <span className="font-semibold">导演：</span>
-                  <span className="text-gray-600">{getDirector()}</span>
-                </div>
-              )}
+          {/* 详细信息 */}
+          <div className="mt-1 flex flex-col gap-2 pl-1">
+            {getDirector() && (
+              <div className="text-gray-600">
+                <span className="font-semibold text-gray-900">导演：</span>
+                <span>{getDirector()}</span>
+              </div>
+            )}
 
-              {getActor() && (
-                <div>
-                  <span className="font-semibold">主演：</span>
-                  <span className="text-gray-600">{getActor()}</span>
-                </div>
-              )}
+            {getActor() && (
+              <div className="text-gray-600">
+                <span className="font-semibold text-gray-900">演员：</span>
+                <span>{getActor()}</span>
+              </div>
+            )}
 
-              {getArea() && (
-                <div>
-                  <span className="font-semibold">地区：</span>
-                  <span className="text-gray-600">{getArea()}</span>
-                </div>
-              )}
-
-              {getContent() && (
-                <div>
-                  <span className="font-semibold">剧情简介：</span>
-                  <p className="mt-2 text-gray-600">{getContent()}</p>
-                </div>
-              )}
-            </div>
+            {getContent() && (
+              <div className="mt-3 text-gray-600">
+                <div dangerouslySetInnerHTML={{ __html: getContent() }} />
+              </div>
+            )}
           </div>
-        </CardBody>
-      </Card>
+        </div>
+      </div>
 
       {/* 播放列表 */}
-      {detail.episodes && detail.episodes.length > 0 && (
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-bold">播放列表</h2>
-          </CardHeader>
-          <CardBody>
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-              {detail.episodes.map((_, index) => (
-                <Button
-                  key={index}
-                  size="sm"
-                  color={selectedEpisode === index ? 'primary' : 'default'}
-                  variant={selectedEpisode === index ? 'solid' : 'flat'}
-                  onPress={() => handlePlayEpisode(index)}
-                >
-                  第{index + 1}集
-                </Button>
-              ))}
-            </div>
-          </CardBody>
-        </Card>
+      {getEpisodesNames() && getEpisodesNames().length > 0 && (
+        <div className="mt-8 grid grid-cols-3 gap-5 md:grid-cols-6 lg:grid-cols-8">
+          {getEpisodesNames().map((name, index) => (
+            <Button
+              key={name}
+              size="md"
+              color="default"
+              variant="shadow"
+              className="border border-gray-200 bg-white/30 text-gray-800 shadow backdrop-blur-md transition-all duration-300 hover:scale-105 hover:bg-black/80 hover:text-white"
+              onPress={() => handlePlayEpisode(index)}
+            >
+              {name}
+            </Button>
+          ))}
+        </div>
       )}
     </div>
   )

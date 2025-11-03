@@ -318,30 +318,26 @@ export default function Video() {
       </Card>
 
       {/* 选集列表 */}
-      <Card isBlurred className="bg-background/60 dark:bg-default-100/50 border-none" radius="lg">
-        <CardHeader>
-          <h3 className="text-lg font-bold md:text-xl">选集</h3>
-        </CardHeader>
-        <CardBody>
-          <div className="xs:grid-cols-4 grid grid-cols-3 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
-            {detail.episodes.map((_, index) => (
-              <Button
-                key={index}
-                size="sm"
-                className={
-                  selectedEpisode === index
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-default-100 hover:bg-default-200'
-                }
-                variant={selectedEpisode === index ? 'solid' : 'flat'}
-                onPress={() => handleEpisodeChange(index)}
-              >
-                <span className="text-xs sm:text-sm">{index + 1}</span>
-              </Button>
-            ))}
-          </div>
-        </CardBody>
-      </Card>
+      {detail.videoInfo?.episodes_names && detail.videoInfo?.episodes_names.length > 0 && (
+        <div className="mt-8 grid grid-cols-3 gap-5 opacity-20 transition-opacity duration-400 hover:opacity-100 md:grid-cols-6 lg:grid-cols-8">
+          {detail.videoInfo?.episodes_names.map((name, index) => (
+            <Button
+              key={name}
+              size="md"
+              color="default"
+              variant="shadow"
+              className={
+                selectedEpisode === index
+                  ? 'border border-gray-200 bg-gray-900 text-white shadow'
+                  : 'border border-gray-200 bg-white/30 text-gray-800 shadow backdrop-blur-md transition-all duration-300 hover:scale-105 hover:bg-black/80 hover:text-white'
+              }
+              onPress={() => handleEpisodeChange(index)}
+            >
+              {name}
+            </Button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
