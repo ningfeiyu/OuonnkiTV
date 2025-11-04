@@ -24,17 +24,17 @@ export default function Detail() {
     const calculateEpisodesPerPage = () => {
       const width = window.innerWidth
       let cols = 2 // 手机默认2列
-      let rows = 10 // 默认行数
+      let rows = 8 // 默认行数
 
       if (width >= 1024) {
         cols = 8 // 桌面端8列
-        rows = 6 // 桌面端行数
+        rows = 5 // 桌面端行数，确保一屏显示完整
       } else if (width >= 768) {
         cols = 6 // 平板横屏6列
-        rows = 8 // 平板行数
+        rows = 6 // 平板行数
       } else if (width >= 640) {
         cols = 3 // 平板竖屏3列
-        rows = 10
+        rows = 8
       }
 
       setEpisodesPerPage(cols * rows)
@@ -160,9 +160,7 @@ export default function Detail() {
     if (pageRanges.length === 0) return
 
     // 切换正序倒序时，跳转到第一页
-    if (!currentPageRange || pageRanges.length > 0) {
-      setCurrentPageRange(pageRanges[0].value)
-    }
+    setCurrentPageRange(pageRanges[0].value)
   }, [pageRanges, isReversed])
 
   // 处理播放按钮点击

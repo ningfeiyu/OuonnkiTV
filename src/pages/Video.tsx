@@ -12,7 +12,6 @@ import {
   Chip,
   Spinner,
   Tooltip,
-  Divider,
   Select,
   SelectItem,
 } from '@heroui/react'
@@ -47,7 +46,7 @@ export default function Video() {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isReversed, setIsReversed] = useState(false)
+  const [isReversed, setIsReversed] = useState(true)
   const [currentPageRange, setCurrentPageRange] = useState<string>('')
   const [episodesPerPage, setEpisodesPerPage] = useState(100)
 
@@ -56,17 +55,17 @@ export default function Video() {
     const calculateEpisodesPerPage = () => {
       const width = window.innerWidth
       let cols = 2 // 手机默认2列
-      let rows = 10 // 默认行数
+      let rows = 8 // 默认行数
 
       if (width >= 1024) {
         cols = 8 // 桌面端8列
-        rows = 6 // 桌面端行数
+        rows = 5 // 桌面端行数，确保一屏显示完整
       } else if (width >= 768) {
         cols = 6 // 平板横屏6列
-        rows = 8 // 平板行数
+        rows = 6 // 平板行数
       } else if (width >= 640) {
         cols = 3 // 平板竖屏3列
-        rows = 10
+        rows = 8
       }
 
       setEpisodesPerPage(cols * rows)
@@ -286,23 +285,26 @@ export default function Video() {
 
   // 初始化当前页范围 & 当切换正序倒序时自动调整页码
   useEffect(() => {
-    if (pageRanges.length === 0) return
+    if (pageRanges.length === 0 || !detail?.videoInfo?.episodes_names) return
 
-    // 获取当前选中集在原始列表中的实际索引
+    const totalEpisodes = detail.videoInfo.episodes_names.length
     const actualSelectedIndex = selectedEpisode
+
+    // 根据实际索引计算显示索引
+    const displayIndex = isReversed ? totalEpisodes - 1 - actualSelectedIndex : actualSelectedIndex
 
     // 找到包含当前选集的页范围
     const rangeContainingSelected = pageRanges.find(
-      range => actualSelectedIndex >= range.start && actualSelectedIndex <= range.end,
+      range => displayIndex >= range.start && displayIndex <= range.end,
     )
 
     if (rangeContainingSelected) {
       setCurrentPageRange(rangeContainingSelected.value)
-    } else if (!currentPageRange) {
-      // 如果没有找到且当前页为空，设置为第一页
+    } else {
+      // 如果没有找到，设置为第一页
       setCurrentPageRange(pageRanges[0].value)
     }
-  }, [pageRanges, selectedEpisode, isReversed])
+  }, [pageRanges, selectedEpisode, isReversed, detail?.videoInfo?.episodes_names])
 
   // 当前页显示的剧集
   const currentPageEpisodes = useMemo(() => {
@@ -433,11 +435,22 @@ export default function Video() {
 
       {/* 选集列表 */}
       {detail.videoInfo?.episodes_names && detail.videoInfo?.episodes_names.length > 0 && (
-        <div className="mt-8 flex flex-col">
-          <div className="flex flex-col gap-2 p-3 pl-1">
+        <div className="mt-4 flex flex-col">
+          <div className="flex flex-col gap-2 p-4">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-semibold text-gray-900">选集</h2>
               <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="light"
+                  onPress={() => setIsReversed(!isReversed)}
+                  startContent={
+                    isReversed ? <ArrowUpIcon size={18} /> : <ArrowDownIcon size={18} />
+                  }
+                  className="min-w-unit-16 text-sm text-gray-600"
+                >
+                  {isReversed ? '正序' : '倒序'}
+                </Button>
                 {pageRanges.length > 1 && (
                   <Select
                     size="sm"
@@ -456,25 +469,10 @@ export default function Video() {
                     ))}
                   </Select>
                 )}
-                <span className="text-sm text-gray-600">
-                  共 {detail.videoInfo.episodes_names.length} 集
-                </span>
-                <Button
-                  size="sm"
-                  variant="light"
-                  onPress={() => setIsReversed(!isReversed)}
-                  startContent={
-                    isReversed ? <ArrowUpIcon size={18} /> : <ArrowDownIcon size={18} />
-                  }
-                  className="min-w-unit-16 text-sm text-gray-600"
-                >
-                  {isReversed ? '正序' : '倒序'}
-                </Button>
               </div>
             </div>
-            <Divider></Divider>
           </div>
-          <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-8">
+          <div className="grid grid-cols-2 gap-3 rounded-lg bg-white/30 p-4 pt-0 shadow-lg/5 backdrop-blur-md sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-8">
             {currentPageEpisodes.map(({ name, displayIndex, actualIndex }) => {
               return (
                 <Tooltip
