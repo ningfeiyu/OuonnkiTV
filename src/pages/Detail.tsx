@@ -221,15 +221,67 @@ export default function Detail() {
 
         {/* 详细信息 */}
         <div className="flex flex-1 flex-col gap-3 rounded-lg bg-white/40 p-4 shadow-lg/5 backdrop-blur-md">
-          {/* 移动端封面 */}
-          <img src={getCover()} alt={getTitle()} className="rounded-lg shadow-lg md:hidden" />
+          {/* 移动端详情 */}
+          <div className="md:hidden">
+            <div className="flex h-auto w-full flex-row justify-center gap-4">
+              <img
+                src={getCover()}
+                alt={getTitle()}
+                className="h-full w-1 flex-1/2 rounded-lg object-cover shadow-lg"
+              />
+              <div className="flex flex-1/2 flex-col gap-1 self-end">
+                {getTitle() && (
+                  <h1 className="text-[1rem] font-bold sm:text-2xl">
+                    <span className="line-clamp-2 text-gray-800">{getTitle()}</span>
+                  </h1>
+                )}
+                <div className="text-[0.7rem] sm:text-[1rem]">
+                  {getDirector() && (
+                    <div className="text-gray-500">
+                      <span className="font-semibold text-gray-700">导演：</span>
+                      <span className="line-clamp-2">{getDirector()}</span>
+                    </div>
+                  )}
+
+                  {getActor() && (
+                    <div className="text-gray-500">
+                      <span className="font-semibold text-gray-700">演员：</span>
+                      <span className="line-clamp-2">{getActor()}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-row flex-wrap text-[0.4rem]">
+                  <Chip size="sm" color="primary" variant="shadow" className="mr-1 mb-1">
+                    {getSourceName()}
+                  </Chip>
+                  <Chip size="sm" color="secondary" variant="shadow" className="mr-1 mb-1">
+                    {getYear()}
+                  </Chip>
+                  <Chip size="sm" color="warning" variant="shadow" className="mr-1 mb-1">
+                    {getType()}
+                  </Chip>
+                  <Chip size="sm" color="danger" variant="shadow" className="mr-1 mb-1">
+                    {getArea()}
+                  </Chip>
+                </div>
+              </div>
+            </div>
+            <div>
+              {getContent() && (
+                <div className="mt-3 line-clamp-5 text-[0.8rem] text-gray-600 sm:text-[1rem]">
+                  <div dangerouslySetInnerHTML={{ __html: getContent() }} />
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* 标题 */}
           {getTitle() && (
-            <h1 className="text-3xl font-bold">
+            <h1 className="hidden text-3xl font-bold md:block">
               <span className="text-gray-800">{getTitle()}</span>
             </h1>
           )}
-          <div className="flex flex-wrap gap-x-1 gap-y-2">
+          <div className="hidden flex-wrap gap-x-1 gap-y-2 md:flex">
             <Chip color="primary" variant="shadow" className="mr-2">
               {getSourceName()}
             </Chip>
@@ -245,7 +297,7 @@ export default function Detail() {
           </div>
 
           {/* 详细信息 */}
-          <div className="mt-1 flex flex-col gap-2 pl-1">
+          <div className="mt-1 hidden flex-col gap-2 pl-1 md:flex">
             {getDirector() && (
               <div className="text-gray-600">
                 <span className="font-semibold text-gray-900">导演：</span>
