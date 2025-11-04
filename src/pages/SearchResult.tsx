@@ -21,7 +21,7 @@ import { useDocumentTitle } from '@/hooks'
 export default function SearchResult() {
   const abortCtrlRef = useRef<AbortController | null>(null)
   const { videoAPIs } = useApiStore()
-  const { getCachedResults, setCachedResults } = useSearchStore()
+  const { getCachedResults, updateCachedResults } = useSearchStore()
   const navigate = useNavigate()
 
   const { query } = useParams()
@@ -52,78 +52,147 @@ export default function SearchResult() {
     async (keyword: string | undefined) => {
       if (!keyword) return
 
+      // 搜索指定的 API 列表的内部函数
+      const searchAPIs = async (
+        apisToSearch: typeof selectedAPIs,
+        existingResults: VideoItem[],
+        existingApiIds: string[],
+      ) => {
+        // 取消上一次未完成的搜索
+        abortCtrlRef.current?.abort()
+        const controller = new AbortController()
+        abortCtrlRef.current = controller
+
+        // 取消超时计时
+        if (timeOutTimer.current) {
+          clearTimeout(timeOutTimer.current)
+          timeOutTimer.current = null
+        }
+        timeOutTimer.current = setTimeout(() => {
+          setLoading(false)
+          timeOutTimer.current = null
+        }, PaginationConfig.maxRequestTimeout)
+
+        const completedApiIds = [...existingApiIds]
+        let hasNewResults = false
+
+        const searchPromise = apiService
+          .aggregatedSearch(
+            keyword,
+            apisToSearch,
+            newResults => {
+              hasNewResults = true
+              setSearchRes(prevResults => {
+                const mergedRes = [...prevResults, ...newResults]
+                if (mergedRes.length >= PaginationConfig.singlePageSize) setLoading(false)
+                return mergedRes
+              })
+
+              // 增量缓存新结果
+              // 从 newResults 中提取已完成的 API ID
+              const newApiIds = Array.from(
+                new Set(newResults.map(r => r.source_code).filter((id): id is string => !!id)),
+              )
+              newApiIds.forEach(id => {
+                if (!completedApiIds.includes(id)) {
+                  completedApiIds.push(id)
+                }
+              })
+
+              updateCachedResults(keyword, newResults, completedApiIds, false)
+            },
+            controller.signal,
+          )
+          .then(allResults => {
+            // 搜索完成,更新缓存为完成状态
+            const allApiIds = apisToSearch.map(api => api.id)
+            const finalApiIds = Array.from(new Set([...existingApiIds, ...allApiIds]))
+
+            // 检查是否真的完成了所有选中的 API
+            const selectedApiIds = selectedAPIs.map(api => api.id)
+            const isComplete = selectedApiIds.every(id => finalApiIds.includes(id))
+
+            updateCachedResults(keyword, hasNewResults ? [] : allResults, finalApiIds, isComplete)
+
+            const totalCount = existingResults.length + allResults.length
+            addToast({
+              title: `搜索完成！${isComplete ? '总计' : '当前'} ${totalCount} 条结果`,
+              radius: 'lg',
+              color: 'success',
+              timeout: 2000,
+              classNames: {
+                base: 'bg-white/60 backdrop-blur-lg border-0',
+              },
+            })
+          })
+          .catch(error => {
+            if ((error as Error).name === 'AbortError') {
+              console.error('搜索已取消:', error)
+            } else {
+              console.error('搜索时发生错误:', error)
+            }
+          })
+          .finally(() => {
+            setLoading(false)
+          })
+
+        addToast({
+          title: '持续搜索内容中......',
+          promise: searchPromise,
+          radius: 'lg',
+          timeout: 1,
+          hideCloseButton: true,
+          classNames: {
+            base: 'bg-white/60 backdrop-blur-lg border-0',
+          },
+        })
+      }
+
       // 检查缓存
-      const cachedResults = getCachedResults(keyword)
-      if (cachedResults) {
-        console.log('使用缓存的搜索结果')
-        setSearchRes(cachedResults)
-        setLoading(false)
+      const cached = getCachedResults(keyword)
+      const selectedApiIds = selectedAPIs.map(api => api.id)
+
+      if (cached) {
+        console.log('找到缓存的搜索结果:', cached)
+
+        // 立即显示缓存的结果
+        setSearchRes(cached.results)
+
+        // 检查是否所有 API 都已完成搜索
+        if (cached.isComplete) {
+          console.log('缓存已完成所有 API 搜索')
+          setLoading(false)
+          return
+        }
+
+        // 计算还需要搜索的 API
+        const remainingAPIs = selectedAPIs.filter(api => !cached.completedApiIds.includes(api.id))
+
+        if (remainingAPIs.length === 0) {
+          console.log('所有选中的 API 都已缓存')
+          setLoading(false)
+          // 标记为完成
+          updateCachedResults(keyword, [], selectedApiIds, true)
+          return
+        }
+
+        console.log(
+          `还需搜索 ${remainingAPIs.length} 个 API:`,
+          remainingAPIs.map(a => a.name),
+        )
+
+        // 继续搜索剩余的 API
+        setLoading(true)
+        await searchAPIs(remainingAPIs, cached.results, cached.completedApiIds)
         return
       }
 
-      // 取消上一次未完成的搜索
-      abortCtrlRef.current?.abort()
-      const controller = new AbortController()
-      abortCtrlRef.current = controller
-      // 取消超时计时
-      if (timeOutTimer.current) {
-        clearTimeout(timeOutTimer.current)
-        timeOutTimer.current = null
-      }
-      timeOutTimer.current = setTimeout(() => {
-        setLoading(false)
-        timeOutTimer.current = null
-      }, PaginationConfig.maxRequestTimeout)
+      // 没有缓存,从头开始搜索
+      console.log('没有缓存,开始全新搜索')
       setSearchRes([])
-      const searchPromise = apiService
-        .aggregatedSearch(
-          keyword,
-          selectedAPIs,
-          newResults => {
-            setSearchRes(prevResults => {
-              const mergedRes = [...prevResults, ...newResults]
-              if (mergedRes.length >= PaginationConfig.singlePageSize) setLoading(false)
-              return mergedRes
-            })
-          },
-          controller.signal,
-        )
-        .then(allResults => {
-          // 缓存搜索结果
-          setCachedResults(keyword, allResults)
-          addToast({
-            title: '全部内容搜索完成！总计 ' + allResults.length + ' 条结果',
-            radius: 'lg',
-            color: 'success',
-            timeout: 2000,
-            classNames: {
-              base: 'bg-white/60 backdrop-blur-lg border-0',
-            },
-          })
-        })
-        .catch(error => {
-          if ((error as Error).name === 'AbortError') {
-            console.error('搜索已取消:', error)
-          } else {
-            console.error('搜索时发生错误:', error)
-          }
-        })
-        .finally(() => {
-          setLoading(false)
-        })
-
-      addToast({
-        title: '持续搜索内容中......',
-        promise: searchPromise,
-        radius: 'lg',
-        timeout: 1,
-        hideCloseButton: true,
-        classNames: {
-          base: 'bg-white/60 backdrop-blur-lg border-0',
-        },
-      })
+      await searchAPIs(selectedAPIs, [], [])
     },
-    [selectedAPIs, getCachedResults, setCachedResults],
+    [selectedAPIs, getCachedResults, updateCachedResults],
   )
 
   // 动态更新页面标题

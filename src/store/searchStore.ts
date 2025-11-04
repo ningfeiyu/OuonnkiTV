@@ -6,14 +6,24 @@ import { v4 as uuidv4 } from 'uuid'
 
 // 搜索结果缓存最大数量
 const MAX_CACHE_SIZE = 10
+// 缓存过期时间: 1天 (毫秒)
+const CACHE_EXPIRY_TIME = 24 * 60 * 60 * 1000
+
+// 缓存项接口
+interface SearchCacheItem {
+  results: VideoItem[] // 搜索结果
+  completedApiIds: string[] // 已完成搜索的 API ID 列表
+  isComplete: boolean // 是否已完成所有 API 的搜索
+  timestamp: number // 缓存时间戳
+}
 
 interface SearchState {
   // 当前搜索查询
   query: string
   // 搜索历史记录
   searchHistory: SearchHistory
-  // 搜索结果缓存 (query -> results)
-  searchResultsCache: Record<string, VideoItem[]>
+  // 搜索结果缓存 (query -> cache item)
+  searchResultsCache: Record<string, SearchCacheItem>
 }
 
 interface SearchActions {
@@ -28,11 +38,18 @@ interface SearchActions {
   // 清空搜索历史
   clearSearchHistory: () => void
   // 获取缓存的搜索结果
-  getCachedResults: (query: string) => VideoItem[] | undefined
-  // 设置搜索结果缓存
-  setCachedResults: (query: string, results: VideoItem[]) => void
+  getCachedResults: (query: string) => SearchCacheItem | undefined
+  // 设置搜索结果缓存(增量更新)
+  updateCachedResults: (
+    query: string,
+    newResults: VideoItem[],
+    completedApiIds: string[],
+    isComplete: boolean,
+  ) => void
   // 清空搜索结果缓存
   clearSearchResultsCache: () => void
+  // 清理过期的缓存
+  cleanExpiredCache: () => void
 }
 
 type SearchStore = SearchState & SearchActions
@@ -101,20 +118,91 @@ export const useSearchStore = create<SearchStore>()(
         },
 
         getCachedResults: (query: string) => {
-          return get().searchResultsCache[query]
+          const cached = get().searchResultsCache[query]
+
+          // 检查缓存是否存在
+          if (!cached) {
+            return undefined
+          }
+
+          // 检查缓存是否过期
+          const now = Date.now()
+          const isExpired = now - cached.timestamp > CACHE_EXPIRY_TIME
+
+          if (isExpired) {
+            console.log(`缓存已过期: ${query}`)
+            // 删除过期缓存
+            set(state => {
+              delete state.searchResultsCache[query]
+            })
+            return undefined
+          }
+
+          return cached
         },
 
-        setCachedResults: (query: string, results: VideoItem[]) => {
+        updateCachedResults: (
+          query: string,
+          newResults: VideoItem[],
+          completedApiIds: string[],
+          isComplete: boolean,
+        ) => {
           set(state => {
-            // 如果缓存数量超过限制,删除最旧的缓存
-            const cacheKeys = Object.keys(state.searchResultsCache)
-            if (cacheKeys.length >= MAX_CACHE_SIZE) {
-              const firstKey = cacheKeys[0]
-              if (firstKey) {
-                delete state.searchResultsCache[firstKey]
+            const existing = state.searchResultsCache[query]
+
+            if (existing) {
+              // 合并结果,去重
+              const mergedResults = [...existing.results, ...newResults]
+              const seen = new Set<string>()
+              const uniqueResults = mergedResults.filter(item => {
+                const key = `${item.source_code}_${item.vod_id}`
+                if (!seen.has(key)) {
+                  seen.add(key)
+                  return true
+                }
+                return false
+              })
+
+              // 合并已完成的 API ID
+              const mergedApiIds = Array.from(
+                new Set([...existing.completedApiIds, ...completedApiIds]),
+              )
+
+              state.searchResultsCache[query] = {
+                results: uniqueResults,
+                completedApiIds: mergedApiIds,
+                isComplete: isComplete || existing.isComplete,
+                timestamp: Date.now(),
+              }
+            } else {
+              // 新建缓存项
+              // 如果缓存数量超过限制,删除最旧的缓存
+              const cacheKeys = Object.keys(state.searchResultsCache)
+              if (cacheKeys.length >= MAX_CACHE_SIZE) {
+                // 找到最旧的缓存
+                let oldestKey = cacheKeys[0]
+                let oldestTime = state.searchResultsCache[oldestKey]?.timestamp || Date.now()
+
+                cacheKeys.forEach(key => {
+                  const timestamp = state.searchResultsCache[key]?.timestamp || Date.now()
+                  if (timestamp < oldestTime) {
+                    oldestTime = timestamp
+                    oldestKey = key
+                  }
+                })
+
+                if (oldestKey) {
+                  delete state.searchResultsCache[oldestKey]
+                }
+              }
+
+              state.searchResultsCache[query] = {
+                results: newResults,
+                completedApiIds,
+                isComplete,
+                timestamp: Date.now(),
               }
             }
-            state.searchResultsCache[query] = results
           })
         },
 
@@ -123,12 +211,33 @@ export const useSearchStore = create<SearchStore>()(
             state.searchResultsCache = {}
           })
         },
+
+        cleanExpiredCache: () => {
+          set(state => {
+            const now = Date.now()
+            const cacheKeys = Object.keys(state.searchResultsCache)
+            let removedCount = 0
+
+            cacheKeys.forEach(key => {
+              const cached = state.searchResultsCache[key]
+              if (cached && now - cached.timestamp > CACHE_EXPIRY_TIME) {
+                delete state.searchResultsCache[key]
+                removedCount++
+              }
+            })
+
+            if (removedCount > 0) {
+              console.log(`清理了 ${removedCount} 个过期缓存`)
+            }
+          })
+        },
       })),
       {
         name: 'ouonnki-tv-search-store', // 持久化存储的键名
         partialize: state => ({
-          // 只持久化搜索历史，不持久化当前查询和搜索状态
+          // 持久化搜索历史和搜索结果缓存
           searchHistory: state.searchHistory,
+          searchResultsCache: state.searchResultsCache,
         }),
       },
     ),
