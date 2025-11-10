@@ -12,6 +12,7 @@ export const useSearch = () => {
     if (query.trim().length > 0) {
       // 设置当前搜索查询
       setSearch(query)
+
       // 添加到搜索历史
       addSearchHistoryItem(query)
 

@@ -5,13 +5,15 @@ import { HeroUIProvider, ToastProvider } from '@heroui/react'
 import App from '@/App'
 import MyRouter from '@/router/MyRouter'
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <HeroUIProvider>
-      <ToastProvider placement="top-center" />
-      <MyRouter>
-        <App />
-      </MyRouter>
-    </HeroUIProvider>
-  </StrictMode>,
+const root = document.getElementById('root')!
+
+const app = (
+  <HeroUIProvider>
+    <ToastProvider placement="top-center" toastOffset={68} />
+    <MyRouter>
+      <App />
+    </MyRouter>
+  </HeroUIProvider>
 )
+
+createRoot(root).render(import.meta.env.DEVELOPMENT ? <StrictMode>{app}</StrictMode> : app)

@@ -28,6 +28,7 @@ import { v4 as uuidv4 } from 'uuid'
 
 import { useApiStore } from '@/store/apiStore'
 import type { VideoApi } from '@/types'
+import { useViewport } from '@/hooks'
 
 import {
   CheckIcon,
@@ -152,6 +153,8 @@ export default function SettingsModal({
   isOpen: boolean
   onOpenChange: (isOpen: boolean) => void
 }) {
+  const { isMobile } = useViewport()
+
   const CardClassNames = {
     base: 'overflow-y-auto h-[17rem] w-full bg-transparent dark:bg-transparent border-medium border-default-200 shadow-xs rounded-medium',
   }
@@ -276,7 +279,7 @@ export default function SettingsModal({
   return (
     <Modal
       classNames={{
-        base: 'bg-transparent',
+        base: 'bg-transparent max-w-none w-auto',
         backdrop: 'bg-white/10',
       }}
       hideCloseButton
@@ -286,9 +289,14 @@ export default function SettingsModal({
     >
       <ModalContent>
         <ModalHeader>个性化设置</ModalHeader>
-        <ModalBody>
-          <div className="flex flex-col">
-            <Tabs variant="bordered" isVertical disabledKeys={['other']}>
+        <ModalBody className="flex-0">
+          <div className="flex flex-col md:w-130">
+            <Tabs
+              variant="bordered"
+              isVertical={!isMobile}
+              disabledKeys={['other']}
+              className="w-full md:w-auto"
+            >
               <Tab className="w-full" key="video-source" title="视频源选择">
                 <Card classNames={CardClassNames}>
                   <CardBody className="relative flex flex-col overflow-hidden p-0">

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useSearchHistory, useSearch } from '@/hooks'
 import { useVersionStore } from '@/store/versionStore'
 import { useApiStore } from '@/store/apiStore'
+import { useSearchStore } from '@/store/searchStore'
 const UpdateModal = lazy(() => import('@/components/UpdateModal'))
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
@@ -23,6 +24,7 @@ function App() {
   const { search, setSearch, searchMovie } = useSearch()
   const { hasNewVersion, setShowUpdateModal } = useVersionStore()
   const { initializeEnvSources } = useApiStore()
+  const { cleanExpiredCache } = useSearchStore()
   const [buttonTransitionStatus, setButtonTransitionStatus] = useState({
     opacity: 0,
     filter: 'blur(5px)',
@@ -48,6 +50,9 @@ function App() {
 
   // 检查版本更新和初始化环境变量视频源
   useEffect(() => {
+    // 清理过期的搜索缓存
+    cleanExpiredCache()
+
     // 检查是否需要初始化
     const needsInitialization = localStorage.getItem('envSourcesInitialized') !== 'true'
     if (needsInitialization) {
@@ -60,7 +65,7 @@ function App() {
     if (hasNewVersion()) {
       setShowUpdateModal(true)
     }
-  }, [initializeEnvSources, hasNewVersion, setShowUpdateModal])
+  }, [initializeEnvSources, hasNewVersion, setShowUpdateModal, cleanExpiredCache])
 
   const handleSearch = () => {
     searchMovie(search)
@@ -266,8 +271,12 @@ function App() {
             </motion.div>
           )}
         </div>
-        <Analytics />
-        <SpeedInsights />
+        {import.meta.env.VITE_DISABLE_ANALYTICS !== 'true' && (
+          <>
+            <Analytics />
+            <SpeedInsights />
+          </>
+        )}
       </motion.div>
     </>
   )

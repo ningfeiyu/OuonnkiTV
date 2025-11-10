@@ -1,18 +1,29 @@
-import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router'
+import { useEffect, useRef, useState, useMemo } from 'react'
+import { useNavigate, useParams } from 'react-router'
 import Player from 'xgplayer'
 import { Events } from 'xgplayer'
 import HlsPlugin from 'xgplayer-hls'
 import 'xgplayer/dist/index.min.css'
-import { Card, CardHeader, CardBody, Button, Chip, Spinner } from '@heroui/react'
-import type { DetailResponse, VideoItem } from '@/types'
+import {
+  Card,
+  CardHeader,
+  CardBody,
+  Button,
+  Chip,
+  Spinner,
+  Tooltip,
+  Select,
+  SelectItem,
+} from '@heroui/react'
+import type { DetailResponse } from '@/types'
 import { apiService } from '@/services/api.service'
 import { useApiStore } from '@/store/apiStore'
 import { useViewingHistoryStore } from '@/store/viewingHistoryStore'
+import { useDocumentTitle } from '@/hooks'
+import { ArrowUpIcon, ArrowDownIcon } from '@/components/icons'
 import _ from 'lodash'
 
 export default function Video() {
-  const location = useLocation()
   const navigate = useNavigate()
   const { sourceCode, vodId, episodeIndex } = useParams<{
     sourceCode: string
@@ -28,29 +39,64 @@ export default function Video() {
   const { addViewingHistory, viewingHistory } = useViewingHistoryStore()
 
   // 状态管理
-  const [detail, setDetail] = useState<DetailResponse | null>(location.state?.detail || null)
-  const [videoItem, setVideoItem] = useState<VideoItem | undefined>(location.state?.videoItem)
+  const [detail, setDetail] = useState<DetailResponse | null>(null)
   const [selectedEpisode, setSelectedEpisode] = useState(() => {
     const index = parseInt(episodeIndex || '0')
     return isNaN(index) ? 0 : index
   })
-  const [loading, setLoading] = useState(!location.state?.detail)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isReversed, setIsReversed] = useState(true)
+  const [currentPageRange, setCurrentPageRange] = useState<string>('')
+  const [episodesPerPage, setEpisodesPerPage] = useState(100)
+
+  // 计算响应式的每页集数 (基于屏幕尺寸和列数)
+  useEffect(() => {
+    const calculateEpisodesPerPage = () => {
+      const width = window.innerWidth
+      let cols = 2 // 手机默认2列
+      let rows = 8 // 默认行数
+
+      if (width >= 1024) {
+        cols = 8 // 桌面端8列
+        rows = 5 // 桌面端行数，确保一屏显示完整
+      } else if (width >= 768) {
+        cols = 6 // 平板横屏6列
+        rows = 6 // 平板行数
+      } else if (width >= 640) {
+        cols = 3 // 平板竖屏3列
+        rows = 8
+      }
+
+      setEpisodesPerPage(cols * rows)
+    }
+
+    calculateEpisodesPerPage()
+    window.addEventListener('resize', calculateEpisodesPerPage)
+    return () => window.removeEventListener('resize', calculateEpisodesPerPage)
+  }, [])
 
   // 获取显示信息
-  const getTitle = () => videoItem?.vod_name || detail?.videoInfo?.title || '未知视频'
-  const sourceName = videoItem?.source_name || detail?.videoInfo?.source_name || '未知来源'
+  const getTitle = () => detail?.videoInfo?.title || '未知视频'
+  const sourceName = detail?.videoInfo?.source_name || '未知来源'
+
+  // 动态更新页面标题
+  const pageTitle = useMemo(() => {
+    const title = detail?.videoInfo?.title
+    if (title) {
+      return `${title}`
+    }
+    return '视频播放'
+  }, [detail?.videoInfo?.title])
+
+  useDocumentTitle(pageTitle)
 
   // 获取视频详情
   useEffect(() => {
     const fetchVideoDetail = async () => {
       if (!sourceCode || !vodId) {
         setError('缺少必要的参数')
-        return
-      }
-
-      // 如果已有数据，不需要重新获取
-      if (detail && detail.episodes && detail.episodes.length > 0) {
+        setLoading(false)
         return
       }
 
@@ -69,24 +115,6 @@ export default function Video() {
 
         if (response.code === 200 && response.episodes && response.episodes.length > 0) {
           setDetail(response)
-          // 如果没有 videoItem，使用 response 中的信息
-          if (!videoItem && response.videoInfo) {
-            setVideoItem({
-              vod_id: vodId,
-              vod_name: response.videoInfo.title,
-              vod_pic: response.videoInfo.cover,
-              vod_remarks: response.videoInfo.remarks,
-              type_name: response.videoInfo.type,
-              vod_year: response.videoInfo.year,
-              vod_area: response.videoInfo.area,
-              vod_director: response.videoInfo.director,
-              vod_actor: response.videoInfo.actor,
-              vod_content: response.videoInfo.desc,
-              source_name: response.videoInfo.source_name,
-              source_code: response.videoInfo.source_code,
-              api_url: api.url,
-            })
-          }
         } else {
           throw new Error(response.msg || '获取视频详情失败')
         }
@@ -99,7 +127,7 @@ export default function Video() {
     }
 
     fetchVideoDetail()
-  }, [sourceCode, vodId, detail, videoItem, videoAPIs])
+  }, [sourceCode, vodId, videoAPIs])
 
   // 监听 selectedEpisode 和 URL 参数变化
   useEffect(() => {
@@ -107,7 +135,7 @@ export default function Video() {
     if (!isNaN(urlEpisodeIndex) && urlEpisodeIndex !== selectedEpisode) {
       setSelectedEpisode(urlEpisodeIndex)
     }
-  }, [episodeIndex])
+  }, [episodeIndex, selectedEpisode])
 
   useEffect(() => {
     if (!detail?.episodes || !detail.episodes[selectedEpisode]) return
@@ -143,14 +171,15 @@ export default function Video() {
     // 记录观看历史
     const player = playerRef.current
     const normalAddHistory = () => {
-      if (!sourceCode || !vodId) return
+      if (!sourceCode || !vodId || !detail?.videoInfo) return
       addViewingHistory({
-        title: getTitle(),
-        imageUrl: videoItem?.vod_pic || '',
+        title: detail.videoInfo.title || '未知视频',
+        imageUrl: detail.videoInfo.cover || '',
         sourceCode: sourceCode || '',
-        sourceName: videoItem?.source_name || '',
+        sourceName: detail.videoInfo.source_name || '',
         vodId: vodId || '',
         episodeIndex: selectedEpisode,
+        episodeName: detail.videoInfo.episodes_names?.[selectedEpisode],
         playbackPosition: player.currentTime || 0,
         duration: player.duration || 0,
         timestamp: Date.now(),
@@ -166,7 +195,7 @@ export default function Video() {
     const TIME_UPDATE_INTERVAL = 3000
 
     const timeUpdateHandler = () => {
-      if (!sourceCode || !vodId) return
+      if (!sourceCode || !vodId || !detail?.videoInfo) return
       const currentTime = player.currentTime || 0
       const duration = player.duration || 0
       const timeSinceLastUpdate = Date.now() - lastTimeUpdate
@@ -174,12 +203,13 @@ export default function Video() {
       if (timeSinceLastUpdate >= TIME_UPDATE_INTERVAL && currentTime > 0 && duration > 0) {
         lastTimeUpdate = Date.now()
         addViewingHistory({
-          title: getTitle(),
-          imageUrl: videoItem?.vod_pic || '',
+          title: detail.videoInfo.title || '未知视频',
+          imageUrl: detail.videoInfo.cover || '',
           sourceCode: sourceCode || '',
-          sourceName: videoItem?.source_name || '',
+          sourceName: detail.videoInfo.source_name || '',
           vodId: vodId || '',
           episodeIndex: selectedEpisode,
+          episodeName: detail.videoInfo.episodes_names?.[selectedEpisode],
           playbackPosition: currentTime,
           duration: duration,
           timestamp: Date.now(),
@@ -201,14 +231,112 @@ export default function Video() {
   }, [selectedEpisode, detail, sourceCode, vodId, addViewingHistory])
 
   // 处理集数切换
-  const handleEpisodeChange = (index: number) => {
-    setSelectedEpisode(index)
+  const handleEpisodeChange = (displayIndex: number) => {
+    // displayIndex 是在当前显示列表中的索引（已考虑倒序）
+    // 需要转换成原始列表中的实际索引
+    const actualIndex = isReversed
+      ? (detail?.videoInfo?.episodes_names?.length || 0) - 1 - displayIndex
+      : displayIndex
+    setSelectedEpisode(actualIndex)
     // 更新 URL，保持路由同步
-    navigate(`/video/${sourceCode}/${vodId}/${index}`, {
+    navigate(`/video/${sourceCode}/${vodId}/${actualIndex}`, {
       replace: true,
-      state: { detail, videoItem },
     })
   }
+
+  // 计算分页范围（根据正序倒序调整标签）
+  const pageRanges = useMemo(() => {
+    const totalEpisodes = detail?.videoInfo?.episodes_names?.length || 0
+    if (totalEpisodes === 0) return []
+
+    const ranges: { label: string; value: string; start: number; end: number }[] = []
+
+    if (isReversed) {
+      // 倒序：从最后一集开始
+      for (let i = 0; i < totalEpisodes; i += episodesPerPage) {
+        const start = i
+        const end = Math.min(i + episodesPerPage - 1, totalEpisodes - 1)
+        // 倒序时，标签应该显示从大到小
+        const labelStart = totalEpisodes - start
+        const labelEnd = totalEpisodes - end
+        ranges.push({
+          label: `${labelStart}-${labelEnd}`,
+          value: `${start}-${end}`,
+          start,
+          end,
+        })
+      }
+    } else {
+      // 正序：从第一集开始
+      for (let i = 0; i < totalEpisodes; i += episodesPerPage) {
+        const start = i
+        const end = Math.min(i + episodesPerPage - 1, totalEpisodes - 1)
+        ranges.push({
+          label: `${start + 1}-${end + 1}`,
+          value: `${start}-${end}`,
+          start,
+          end,
+        })
+      }
+    }
+
+    return ranges
+  }, [detail?.videoInfo?.episodes_names?.length, episodesPerPage, isReversed])
+
+  // 初始化当前页范围 & 当切换正序倒序时自动调整页码
+  useEffect(() => {
+    if (pageRanges.length === 0 || !detail?.videoInfo?.episodes_names) return
+
+    const totalEpisodes = detail.videoInfo.episodes_names.length
+    const actualSelectedIndex = selectedEpisode
+
+    // 根据实际索引计算显示索引
+    const displayIndex = isReversed ? totalEpisodes - 1 - actualSelectedIndex : actualSelectedIndex
+
+    // 找到包含当前选集的页范围
+    const rangeContainingSelected = pageRanges.find(
+      range => displayIndex >= range.start && displayIndex <= range.end,
+    )
+
+    if (rangeContainingSelected) {
+      setCurrentPageRange(rangeContainingSelected.value)
+    } else {
+      // 如果没有找到，设置为第一页
+      setCurrentPageRange(pageRanges[0].value)
+    }
+  }, [pageRanges, selectedEpisode, isReversed, detail?.videoInfo?.episodes_names])
+
+  // 当前页显示的剧集
+  const currentPageEpisodes = useMemo(() => {
+    if (!currentPageRange || !detail?.videoInfo?.episodes_names) return []
+
+    const [start, end] = currentPageRange.split('-').map(Number)
+    const totalEpisodes = detail.videoInfo.episodes_names.length
+    const episodes = detail.videoInfo.episodes_names
+
+    if (isReversed) {
+      // 倒序：取出对应范围的集数并反转
+      const selectedEpisodes = []
+      for (let i = start; i <= end; i++) {
+        const actualIndex = totalEpisodes - 1 - i
+        if (actualIndex >= 0 && actualIndex < totalEpisodes) {
+          selectedEpisodes.push({
+            name: episodes[actualIndex],
+            displayIndex: i,
+            actualIndex: actualIndex,
+          })
+        }
+      }
+      return selectedEpisodes
+    } else {
+      // 正序：直接取出对应范围
+      return episodes.slice(start, end + 1).map((name, idx) => ({
+        name,
+        displayIndex: start + idx,
+        actualIndex: start + idx,
+      }))
+    }
+  }, [currentPageRange, detail?.videoInfo?.episodes_names, isReversed])
 
   // 加载状态
   if (loading) {
@@ -306,30 +434,72 @@ export default function Video() {
       </Card>
 
       {/* 选集列表 */}
-      <Card isBlurred className="bg-background/60 dark:bg-default-100/50 border-none" radius="lg">
-        <CardHeader>
-          <h3 className="text-lg font-bold md:text-xl">选集</h3>
-        </CardHeader>
-        <CardBody>
-          <div className="xs:grid-cols-4 grid grid-cols-3 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
-            {detail.episodes.map((_, index) => (
-              <Button
-                key={index}
-                size="sm"
-                className={
-                  selectedEpisode === index
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-default-100 hover:bg-default-200'
-                }
-                variant={selectedEpisode === index ? 'solid' : 'flat'}
-                onPress={() => handleEpisodeChange(index)}
-              >
-                <span className="text-xs sm:text-sm">{index + 1}</span>
-              </Button>
-            ))}
+      {detail.videoInfo?.episodes_names && detail.videoInfo?.episodes_names.length > 0 && (
+        <div className="mt-4 flex flex-col">
+          <div className="flex flex-col gap-2 p-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-semibold text-gray-900">选集</h2>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="light"
+                  onPress={() => setIsReversed(!isReversed)}
+                  startContent={
+                    isReversed ? <ArrowUpIcon size={18} /> : <ArrowDownIcon size={18} />
+                  }
+                  className="min-w-unit-16 text-sm text-gray-600"
+                >
+                  {isReversed ? '正序' : '倒序'}
+                </Button>
+                {pageRanges.length > 1 && (
+                  <Select
+                    size="sm"
+                    selectedKeys={[currentPageRange]}
+                    onChange={e => setCurrentPageRange(e.target.value)}
+                    className="w-32"
+                    classNames={{
+                      trigger: 'bg-white/30 backdrop-blur-md border border-gray-200',
+                      value: 'text-gray-800 font-medium',
+                      popoverContent: 'bg-white/40 backdrop-blur-2xl border border-gray-200/50',
+                    }}
+                    aria-label="选择集数范围"
+                  >
+                    {pageRanges.map(range => (
+                      <SelectItem key={range.value}>{range.label}</SelectItem>
+                    ))}
+                  </Select>
+                )}
+              </div>
+            </div>
           </div>
-        </CardBody>
-      </Card>
+          <div className="grid grid-cols-2 gap-3 rounded-lg bg-white/30 p-4 pt-0 shadow-lg/5 backdrop-blur-md sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-8">
+            {currentPageEpisodes.map(({ name, displayIndex, actualIndex }) => {
+              return (
+                <Tooltip
+                  key={`${name}-${displayIndex}`}
+                  content={name}
+                  placement="top"
+                  delay={1000}
+                >
+                  <Button
+                    size="md"
+                    color="default"
+                    variant="shadow"
+                    className={
+                      selectedEpisode === actualIndex
+                        ? 'border border-gray-200 bg-gray-900 text-white drop-shadow-2xl'
+                        : 'border border-gray-200 bg-white/30 text-gray-800 drop-shadow-2xl backdrop-blur-md transition-all duration-300 hover:scale-105 hover:bg-black/80 hover:text-white'
+                    }
+                    onPress={() => handleEpisodeChange(displayIndex)}
+                  >
+                    <span className="overflow-hidden text-ellipsis whitespace-nowrap">{name}</span>
+                  </Button>
+                </Tooltip>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { Navbar, NavbarBrand, NavbarContent, Input } from '@heroui/react'
 import { OkiLogo, SearchIcon } from '@/components/icons'
-import { NavLink, useLocation } from 'react-router'
+import { NavLink } from 'react-router'
 import { useSearch } from '@/hooks'
 import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
@@ -9,10 +9,9 @@ import RecentHistory from '@/components/RecentHistory'
 export default function Navigation() {
   const { search, searchMovie } = useSearch()
   const [inputContent, setInputContent] = useState('')
-  const location = useLocation()
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === 'Enter') {
-      searchMovie(inputContent, !location.pathname.startsWith('/search/'))
+      searchMovie(inputContent)
     }
   }
   useEffect(() => {

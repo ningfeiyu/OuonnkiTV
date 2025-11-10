@@ -107,6 +107,7 @@ class ApiService {
 
       const videoDetail = data.list[0]
       let episodes: string[] = []
+      let episodeNames: string[] = []
 
       // 提取播放地址
       if (videoDetail.vod_play_url) {
@@ -123,6 +124,11 @@ class ApiService {
             .filter(
               (url: string) => url && (url.startsWith('http://') || url.startsWith('https://')),
             )
+
+          episodeNames = episodeList.map((ep: string, index: number) => {
+            const parts = ep.split('$')
+            return parts.length > 1 ? parts[0] : `第${index + 1}集`
+          })
         }
       }
 
@@ -148,6 +154,7 @@ class ApiService {
           remarks: videoDetail.vod_remarks,
           source_name: api.name,
           source_code: api.id,
+          episodes_names: episodeNames,
         },
       }
     } catch (error) {
@@ -199,7 +206,7 @@ class ApiService {
     selectedAPIs: VideoApi[],
     onNewResults: (results: VideoItem[]) => void,
     signal?: AbortSignal,
-  ): Promise<void[]> {
+  ): Promise<VideoItem[]> {
     if (selectedAPIs.length === 0) {
       console.warn('没有选中任何 API 源')
       return Promise.resolve([])
@@ -220,15 +227,15 @@ class ApiService {
 
     const tasks = selectedAPIs.map(api =>
       limiter(async () => {
-        if (aborted) return
+        if (aborted) return [] as VideoItem[]
         let results: VideoItem[] = []
         try {
           results = await this.searchSingleSource(query, api)
         } catch (error) {
-          if (aborted) return
+          if (aborted) return [] as VideoItem[]
           console.warn(`${api.name} 源搜索失败:`, error)
         }
-        if (aborted) return
+        if (aborted) return [] as VideoItem[]
 
         const newUnique = results.filter(item => {
           const key = `${item.source_code}_${item.vod_id}`
@@ -238,15 +245,16 @@ class ApiService {
           }
           return false
         })
-        if (aborted || newUnique.length === 0) return
+        if (aborted || newUnique.length === 0) return [] as VideoItem[]
 
         onNewResults(newUnique)
+        return newUnique
       }),
     )
 
-    const allPromise = Promise.all(tasks)
+    const allPromise: Promise<VideoItem[]> = Promise.all(tasks).then(chunks => chunks.flat())
     if (signal) {
-      const abortPromise = new Promise<void[]>((_, reject) => {
+      const abortPromise = new Promise<VideoItem[]>((_, reject) => {
         signal.addEventListener('abort', () => {
           reject(new DOMException('Aborted', 'AbortError'))
         })

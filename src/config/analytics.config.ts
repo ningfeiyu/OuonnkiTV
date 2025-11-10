@@ -21,5 +21,8 @@ export const trackEvent = (
   eventName: string,
   properties?: Record<string, string | number | boolean | null>,
 ) => {
-  track(eventName, properties)
+  // 当禁用Analytics时不执行跟踪
+  if (import.meta.env.VITE_DISABLE_ANALYTICS !== 'true') {
+    track(eventName, properties)
+  }
 }
